@@ -157,10 +157,10 @@ type MergedItem struct {
 	CategoryID         int            `json:"category_id" db:"category_id"`
 	CreatedAt          time.Time      `json:"-" db:"created_at"`
 	UpdatedAt          time.Time      `json:"-" db:"updated_at"`
-	SellerAccountName  string         `json:"seller_account_name"`
-	SellerNumSellItems int            `json:"seller_num_sell_items"`
-	BuyerAccountName   sql.NullString `json:"buyer_account_name"`
-	BuyerNumSellItems  sql.NullInt32  `json:"buyer_num_sell_items"`
+	SellerAccountName  string         `json:"seller_account_name" db:"seller_account_name"`
+	SellerNumSellItems int            `json:"seller_num_sell_items" db:"seller_num_sell_items"`
+	BuyerAccountName   sql.NullString `json:"buyer_account_name" db:"buyer_account_name"`
+	BuyerNumSellItems  sql.NullInt32  `json:"buyer_num_sell_items" db:"buyer_num_sell_items"`
 }
 
 type ItemSimple struct {
