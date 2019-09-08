@@ -968,7 +968,7 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 	} else {
 		// 1st page
 		err := tx.Select(&items,
-			"SELECT `i`.`id` AS `id`, `id`.`seller_id` AS `seller_id`, `i`.buyer_id` AS `buyer_id`, "+
+			"SELECT `i`.`id` AS `id`, `id`.`seller_id` AS `seller_id`, `i`.`buyer_id` AS `buyer_id`, "+
 				"`i`.`status` AS `status`, `i`.`name` AS `name`, `i`.`price` AS `price`, "+
 				"`i`.`description` AS `description`, `i`.`image_name` AS `image_name`, "+
 				"`i`.category_id` AS `category_id`, `i`.`created_at` AS `created_at`, "+
