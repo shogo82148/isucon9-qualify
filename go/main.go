@@ -1041,6 +1041,7 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 				NumSellItems: int(item.BuyerNumSellItems.Int32),
 			}
 
+			itemDetail.BuyerID = item.BuyerID
 			itemDetail.Buyer = &buyer
 		}
 
