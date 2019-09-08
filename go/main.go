@@ -942,7 +942,7 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 				"`buyer`.`account_name` AS `buyer_account_name`, `buyer`.`num_sell_items` AS `buyer_num_sell_items` "+
 				"FROM `items` AS `i` "+
 				"JOIN `users` AS `seller` ON `i`.`seller_id` = `seller`.`id` "+
-				"JOIN `users` AS `buyer` ON `i`.`buyer_id` = `buyer`.`id` "+
+				"LEFT JOIN `users` AS `buyer` ON `i`.`buyer_id` = `buyer`.`id` "+
 				"WHERE (`i`.`seller_id` = ? OR `i`.`buyer_id` = ?) "+
 				"AND `i`.`status` IN (?,?,?,?,?) "+
 				"AND (`i`.`created_at` < ?  OR (`i`.`created_at` <= ? AND `i`.`id` < ?)) "+
