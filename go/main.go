@@ -1002,6 +1002,7 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	shipmentURL := getShipmentServiceURL()
 	var g errgroup.Group
 	itemDetails := make([]ItemDetail, len(items))
 	for i, item := range items {
@@ -1076,7 +1077,7 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			g.Go(func() error {
-				ssr, err := APIShipmentStatus(getShipmentServiceURL(), &APIShipmentStatusReq{
+				ssr, err := APIShipmentStatus(shipmentURL, &APIShipmentStatusReq{
 					ReserveID: shipping.ReserveID,
 				})
 				if err != nil {
