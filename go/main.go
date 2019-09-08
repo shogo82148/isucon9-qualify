@@ -15,6 +15,8 @@ import (
 	"strconv"
 	"time"
 
+	"golang.org/x/sync/errgroup"
+
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/gorilla/sessions"
 	"github.com/jmoiron/sqlx"
@@ -1000,8 +1002,10 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	itemDetails := []ItemDetail{}
-	for _, item := range items {
+	var g errgroup.Group
+	itemDetails := make([]ItemDetail, len(items))
+	for i, item := range items {
+		i := i
 		seller := UserSimple{
 			ID:           item.SellerID,
 			AccountName:  item.SellerAccountName,
@@ -1055,6 +1059,8 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		itemDetails[i] = itemDetail
+
 		if transactionEvidence.ID > 0 {
 			shipping := Shipping{}
 			err = tx.Get(&shipping, "SELECT * FROM `shippings` WHERE `transaction_evidence_id` = ?", transactionEvidence.ID)
@@ -1069,24 +1075,29 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 				tx.Rollback()
 				return
 			}
-			ssr, err := APIShipmentStatus(getShipmentServiceURL(), &APIShipmentStatusReq{
-				ReserveID: shipping.ReserveID,
+			g.Go(func() error {
+				ssr, err := APIShipmentStatus(getShipmentServiceURL(), &APIShipmentStatusReq{
+					ReserveID: shipping.ReserveID,
+				})
+				if err != nil {
+					return err
+				}
+
+				itemDetails[i].ShippingStatus = ssr.Status
+				return nil
 			})
-			if err != nil {
-				log.Print(err)
-				outputErrorMsg(w, http.StatusInternalServerError, "failed to request to shipment service")
-				tx.Rollback()
-				return
-			}
 
-			itemDetail.TransactionEvidenceID = transactionEvidence.ID
-			itemDetail.TransactionEvidenceStatus = transactionEvidence.Status
-			itemDetail.ShippingStatus = ssr.Status
+			itemDetails[i].TransactionEvidenceID = transactionEvidence.ID
+			itemDetails[i].TransactionEvidenceStatus = transactionEvidence.Status
 		}
-
-		itemDetails = append(itemDetails, itemDetail)
 	}
 	tx.Commit()
+
+	if err := g.Wait(); err != nil {
+		log.Print(err)
+		outputErrorMsg(w, http.StatusInternalServerError, "failed to request to shipment service")
+		return
+	}
 
 	hasNext := false
 	if len(itemDetails) > TransactionsPerPage {
