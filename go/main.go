@@ -1480,47 +1480,81 @@ func postBuy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	scr, err := APIShipmentCreate(getShipmentServiceURL(), &APIShipmentCreateReq{
-		ToAddress:   buyer.Address,
-		ToName:      buyer.AccountName,
-		FromAddress: seller.Address,
-		FromName:    seller.AccountName,
-	})
-	if err != nil {
-		log.Print(err)
+	type shipRes struct {
+		scr *APIShipmentCreateRes
+		err error
+	}
+
+	chScr := make(chan shipRes, 1)
+
+	execShip := func() {
+		scr, err := APIShipmentCreate(getShipmentServiceURL(), &APIShipmentCreateReq{
+			ToAddress:   buyer.Address,
+			ToName:      buyer.AccountName,
+			FromAddress: seller.Address,
+			FromName:    seller.AccountName,
+		})
+		chScr <- shipRes{
+			scr: scr,
+			err: err,
+		}
+	}
+	go execShip()
+
+	type pstrRes struct {
+		pstr *APIPaymentServiceTokenRes
+		err  error
+	}
+
+	chPstr := make(chan pstrRes, 1)
+
+	execToken := func() {
+		pstr, err := APIPaymentToken(getPaymentServiceURL(), &APIPaymentServiceTokenReq{
+			ShopID: PaymentServiceIsucariShopID,
+			Token:  rb.Token,
+			APIKey: PaymentServiceIsucariAPIKey,
+			Price:  targetItem.Price,
+		})
+
+		chPstr <- pstrRes{
+			pstr: pstr,
+			err:  err,
+		}
+	}
+	go execToken()
+
+	scr := <-chScr
+	if scr.err != nil {
+		log.Print(scr.err)
 		outputErrorMsg(w, http.StatusInternalServerError, "failed to request to shipment service")
 		tx.Rollback()
 
 		return
+
 	}
 
-	pstr, err := APIPaymentToken(getPaymentServiceURL(), &APIPaymentServiceTokenReq{
-		ShopID: PaymentServiceIsucariShopID,
-		Token:  rb.Token,
-		APIKey: PaymentServiceIsucariAPIKey,
-		Price:  targetItem.Price,
-	})
-	if err != nil {
-		log.Print(err)
+	pstr := <-chPstr
+	if pstr.err != nil {
+		log.Print(pstr.err)
 
 		outputErrorMsg(w, http.StatusInternalServerError, "payment service is failed")
 		tx.Rollback()
 		return
 	}
 
-	if pstr.Status == "invalid" {
+	if pstr.pstr.Status == "invalid" {
 		outputErrorMsg(w, http.StatusBadRequest, "カード情報に誤りがあります")
 		tx.Rollback()
 		return
 	}
 
-	if pstr.Status == "fail" {
+	if pstr.pstr.Status == "fail" {
 		outputErrorMsg(w, http.StatusBadRequest, "カードの残高が足りません")
 		tx.Rollback()
 		return
 	}
 
-	if pstr.Status != "ok" {
+	if pstr.pstr.Status != "ok" {
 		outputErrorMsg(w, http.StatusBadRequest, "想定外のエラー")
 		tx.Rollback()
 		return
@@ -1531,8 +1565,8 @@ func postBuy(w http.ResponseWriter, r *http.Request) {
 		ShippingsStatusInitial,
 		targetItem.Name,
 		targetItem.ID,
-		scr.ReserveID,
-		scr.ReserveTime,
+		scr.scr.ReserveID,
+		scr.scr.ReserveTime,
 		buyer.Address,
 		buyer.AccountName,
 		seller.Address,
