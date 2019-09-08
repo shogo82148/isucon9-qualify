@@ -2,10 +2,15 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"time"
+
+	"github.com/shogo82148/go-retry"
 )
 
 const (
@@ -13,6 +18,15 @@ const (
 
 	userAgent = "isucon9-qualify-webapp"
 )
+
+var policy = retry.Policy{
+	// 初回待ち時間
+	MinDelay: 100 * time.Millisecond,
+	// 最大待ち時間
+	MaxDelay: time.Second,
+	// 最大試行回数
+	MaxCount: 10,
+}
 
 type APIPaymentServiceTokenReq struct {
 	ShopID string `json:"shop_id"`
@@ -149,6 +163,17 @@ func APIShipmentRequest(shipmentURL string, param *APIShipmentRequestReq) ([]byt
 }
 
 func APIShipmentStatus(shipmentURL string, param *APIShipmentStatusReq) (*APIShipmentStatusRes, error) {
+	retrier := policy.Start(context.Background())
+	for retrier.Continue() {
+		res, err := execAPIShipmentStatus(shipmentURL, param)
+		if err == nil {
+			return res, nil
+		}
+	}
+	return nil, errors.New("fail to call api")
+}
+
+func execAPIShipmentStatus(shipmentURL string, param *APIShipmentStatusReq) (*APIShipmentStatusRes, error) {
 	b, _ := json.Marshal(param)
 
 	req, err := http.NewRequest(http.MethodGet, shipmentURL+"/status", bytes.NewBuffer(b))
